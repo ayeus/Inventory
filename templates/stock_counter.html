@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Stock Counter</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <title>Stock Counmmmnter</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/sc.css') }}">
     <script src="{{ url_for('static', filename='js/script.js') }}" defer></script>
     <style>
         table, th, td {
@@ -73,7 +73,7 @@
         <p class="error">{{ error }}</p>
     {% else %}
         <form method="POST" id="category-form">
-            <label for="category">Select Category:</label>
+            <label for="category">Select aaaa:</label>
             <select name="category" id="category">
                 {% for sanitized_category, original_category in categories %}
                     <option value="{{ sanitized_category }}" {% if sanitized_category == selected_category %}selected{% endif %}>{{ original_category }}</option>

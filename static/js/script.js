@@ -82,6 +82,12 @@ function updateStockForm(headers) {
         const formContainer = document.createElement('div');
         formContainer.className = 'form-container';
         headers.forEach(header => {
+            // Skip null/empty headers (should already be filtered by the server, but double-check)
+            if (!header || header.trim() === '') {
+                console.log("Skipping empty header:", header);
+                return;
+            }
+
             const formGroup = document.createElement('div');
             formGroup.className = 'form-group';
 

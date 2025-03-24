@@ -57,25 +57,28 @@ def stock_counter():
         
         # Get the headers for the selected category (first row of the grid)
         headers = grid_data[0] if grid_data else []
+        # Filter out null/empty headers
+        valid_headers = [header for header in headers if header and str(header).strip() != '']
+        logger.debug("Valid headers for category %s: %s", selected_sanitized_category, valid_headers)
         
         if request.method == 'POST' and 'add_entry' in request.form:
             logger.debug("Received form data: %s", request.form)
-            # Collect the new entry from the form
+            # Collect the new entry from the form, only for valid headers
             new_entry = []
-            for header in headers:
+            for header in valid_headers:
                 # Sanitize the header to match the form field name
                 field_name = header.replace(' ', '_').replace('.', '_').lower()
                 value = request.form.get(field_name, '')
                 new_entry.append(value)
             
             # Save the new entry to stock_entries.xlsx using the original category name
-            success, message = save_stock_entry(selected_original_category, headers, new_entry)
+            success, message = save_stock_entry(selected_original_category, valid_headers, new_entry)
             return jsonify({'success': success, 'message': message})
         
         if not grid_data:
             logger.warning("No data found for category: %s", selected_sanitized_category)
-            return render_template('stock_counter.html', categories=categories, selected_category=selected_sanitized_category, grid_data=[], headers=headers, error="No data available for this category")
-        return render_template('stock_counter.html', categories=categories, selected_category=selected_sanitized_category, grid_data=grid_data, headers=headers, error=None)
+            return render_template('stock_counter.html', categories=categories, selected_category=selected_sanitized_category, grid_data=[], headers=valid_headers, error="No data available for this category")
+        return render_template('stock_counter.html', categories=categories, selected_category=selected_sanitized_category, grid_data=grid_data, headers=valid_headers, error=None)
     except Exception as e:
         logger.error("Error in stock_counter route: %s", str(e))
         return jsonify({'success': False, 'message': f"Error in stock_counter: {str(e)}"}), 500

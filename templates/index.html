@@ -12,16 +12,5 @@
         <a href="/stock_counter">Stock Counter</a>
         <a href="/sales_reform">Sales Reform</a>
     </nav>
-    {% if error %}
-        <p class="error">{{ error }}</p>
-    {% else %}
-        <p>Select a section above to manage the inventory.</p>
-        <h2>Available Categories</h2>
-        <ul>
-            {% for category in categories %}
-                <li>{{ category }}</li>
-            {% endfor %}
-        </ul>
-    {% endif %}
 </body>
 </html>

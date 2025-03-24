@@ -5,6 +5,23 @@
     <title>Sales Reform</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="{{ url_for('static', filename='js/script.js') }}" defer></script>
+    <style>
+        table, th, td {
+            border: 1px solid black;
+            border-collapse: collapse;
+            padding: 5px;
+            text-align: left;
+        }
+        table {
+            width: 100%;
+            max-width: 100%;
+            background-color: white;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
     <h1>Sales Reform</h1>
@@ -19,35 +36,24 @@
         <form method="POST">
             <label for="category">Select Category:</label>
             <select name="category" id="category">
-                {% for category in categories %}
-                    <option value="{{ category }}" {% if category == selected_category %}selected{% endif %}>{{ category }}</option>
+                {% for sanitized_category, original_category in categories %}
+                    <option value="{{ sanitized_category }}" {% if sanitized_category == selected_category %}selected{% endif %}>{{ original_category }}</option>
                 {% endfor %}
             </select>
         </form>
         <table id="inventory-table">
-            <thead>
-                <tr>
-                    {% if inventory_data %}
-                        {% for column in inventory_data[0].keys() %}
-                            <th>{{ column.replace('_', ' ').title() }}</th>
-                        {% endfor %}
-                    {% else %}
-                        <th>No Data</th>
-                    {% endif %}
-                </tr>
-            </thead>
             <tbody>
-                {% if inventory_data %}
-                    {% for item in inventory_data %}
+                {% if grid_data %}
+                    {% for row in grid_data %}
                         <tr>
-                            {% for column in item.keys() %}
-                                <td>{{ item[column] if item[column] is not none else 'N/A' }}</td>
+                            {% for cell in row %}
+                                <td>{{ cell }}</td>
                             {% endfor %}
                         </tr>
                     {% endfor %}
                 {% else %}
                     <tr>
-                        <td>No items found for this category.</td>
+                        <td>No data available for this category.</td>
                     </tr>
                 {% endif %}
             </tbody>

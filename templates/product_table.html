@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Product Table</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/script.js') }}" defer></script>
+</head>
+<body>
+    <h1>Product Table</h1>
+    <nav>
+        <a href="/product_table">Product Table</a>
+        <a href="/stock_counter">Stock Counter</a>
+        <a href="/sales_reform">Sales Reform</a>
+    </nav>
+    {% if error %}
+        <p class="error">{{ error }}</p>
+    {% else %}
+        <form method="POST">
+            <label for="category">Select Category:</label>
+            <select name="category" id="category">
+                {% for category in categories %}
+                    <option value="{{ category }}" {% if category == selected_category %}selected{% endif %}>{{ category }}</option>
+                {% endfor %}
+            </select>
+        </form>
+        <table id="inventory-table">
+            <thead>
+                <tr>
+                    <th>S.No.</th>
+                    <th>Item Name</th>
+                    <th>Stock</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="3">Loading inventory data... (If this persists, ensure JavaScript is enabled and script.js is loaded)</td>
+                </tr>
+            </tbody>
+        </table>
+    {% endif %}
+</body>
+</html>

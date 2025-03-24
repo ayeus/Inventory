@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stock Counter</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/script.js') }}" defer></script>
+</head>
+<body>
+    <h1>Stock Counter</h1>
+    <nav>
+        <a href="/product_table">Product Table</a>
+        <a href="/stock_counter">Stock Counter</a>
+        <a href="/sales_reform">Sales Reform</a>
+    </nav>
+    {% if error %}
+        <p class="error">{{ error }}</p>
+    {% else %}
+        <form method="POST">
+            <label for="category">Select Category:</label>
+            <select name="category" id="category">
+                {% for category in categories %}
+                    <option value="{{ category }}" {% if category == selected_category %}selected{% endif %}>{{ category }}</option>
+                {% endfor %}
+            </select>
+        </form>
+        <table id="inventory-table">
+            <thead>
+                <tr>
+                    <th>S.No.</th>
+                    <th>Item Name</th>
+                    <th>Stock</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="3">Loading inventory data... (If this persists, ensure JavaScript is enabled and script.js is loaded)</td>
+                </tr>
+            </tbody>
+        </table>
+        <h2>Restock Item</h2>
+        <form id="restock-form" method="POST">
+            <input type="hidden" name="category" value="{{ selected_category }}">
+            <label for="item_id">Item S.No.:</label>
+            <input type="number" id="item_id" name="item_id" required>
+            <label for="quantity">Quantity to Add:</label>
+            <input type="number" id="quantity" name="quantity" required min="1">
+            <button type="submit" name="restock">Restock</button>
+        </form>
+        <div id="message"></div>
+    {% endif %}
+</body>
+</html>

@@ -14,10 +14,16 @@ def get_categories(inventory_data):
 
 def get_inventory(inventory_data, category):
     try:
+        logger.debug("Original inventory keys: %s", list(inventory_data.keys()))
+        logger.debug("Looking for sanitized category: %s", category)
         # Map sanitized category back to original
         original_category = next((cat for cat in inventory_data.keys() if cat.replace(',', '_').replace(' ', '_') == category), None)
+        logger.debug("Mapped to original category: %s", original_category)
         if original_category:
-            return inventory_data.get(original_category, [])
+            data = inventory_data.get(original_category, [])
+            logger.debug("Data for %s: %s", original_category, data)
+            return data
+        logger.warning("Category %s not found in inventory data", category)
         return []
     except Exception as e:
         logger.error("Error in get_inventory: %s", str(e))
@@ -29,8 +35,8 @@ def update_inventory(inventory_data, category, item_id, new_stock):
         if not original_category:
             return False
         for item in inventory_data[original_category]:
-            if item['S.No.'] == int(item_id):
-                item['stock'] = new_stock
+            if item['serial_number'] == int(item_id):
+                item['stock_quantity'] = new_stock
                 return True
         return False
     except Exception as e:

@@ -8,10 +8,10 @@ def process_restock(inventory_data, category, item_id, quantity):
         if not original_category:
             return False, "Category not found"
         for item in inventory_data[original_category]:
-            if item['S.No.'] == int(item_id):
-                current_stock = item.get('stock', item.get('QUANTITY (IN 2023-2024)', 0))
-                item['stock'] = current_stock + quantity
-                item_name = item.get('Item_description', item.get('Name of Items', item.get('Equipment’s', 'Unknown')))
+            if item['serial_number'] == int(item_id):
+                current_stock = item.get('stock_quantity', 0)
+                item['stock_quantity'] = current_stock + quantity
+                item_name = item.get('item_name', 'Unknown')
                 return True, f"Restocked {quantity} of {item_name}."
         return False, "Item not found."
     except Exception as e:

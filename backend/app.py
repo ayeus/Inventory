@@ -1,18 +1,37 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 from backend.inventory import get_inventory, get_categories
 from backend.sales import process_sale
 from backend.restock import process_restock
 from backend.excel_handler import load_excel_data, save_to_excel
 import logging
 import os
+import json
+import numpy as np
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Explicitly set the template folder
-app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), '../templates'))
+# Custom JSON encoder to handle NaN and other non-serializable values
+class CustomJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (np.integer, np.floating)):
+            return float(obj) if not np.isnan(obj) else None
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
 
+# Explicitly set the template and static folders
+app = Flask(__name__,
+            template_folder=os.path.join(os.path.dirname(__file__), '../templates'),
+            static_folder=os.path.join(os.path.dirname(__file__), '../static'))
+app.json_encoder = CustomJSONEncoder
+
+# Log static file requests
+@app.route('/static/<path:path>')
+def send_static(path):
+    logger.debug("Serving static file: %s", path)
+    return send_from_directory(app.static_folder, path)
 
 # Load all sheets from Excel into a dictionary
 try:
@@ -37,53 +56,59 @@ def product_table():
     try:
         categories = get_categories(inventory_data)
         if not categories:
-            return render_template('product_table.html', categories=[], selected_category=None, error="No categories available")
+            return render_template('product_table.html', categories=[], selected_category=None, inventory_data=[], error="No categories available")
         selected_category = request.form.get('category', categories[0])
-        return render_template('product_table.html', categories=categories, selected_category=selected_category, error=None)
+        # Fetch inventory data for the selected category
+        inventory_data_for_category = get_inventory(inventory_data, selected_category)
+        return render_template('product_table.html', categories=categories, selected_category=selected_category, inventory_data=inventory_data_for_category, error=None)
     except Exception as e:
         logger.error("Error in product_table route: %s", str(e))
-        return render_template('product_table.html', categories=[], selected_category=None, error="Failed to load product table")
+        return render_template('product_table.html', categories=[], selected_category=None, inventory_data=[], error="Failed to load product table")
 
 @app.route('/stock_counter', methods=['GET', 'POST'])
 def stock_counter():
     try:
         categories = get_categories(inventory_data)
         if not categories:
-            return render_template('stock_counter.html', categories=[], selected_category=None, error="No categories available")
+            return render_template('stock_counter.html', categories=[], selected_category=None, inventory_data=[], error="No categories available")
         selected_category = request.form.get('category', categories[0])
+        inventory_data_for_category = get_inventory(inventory_data, selected_category)
         if request.method == 'POST' and 'restock' in request.form:
             item_id = request.form['item_id']
             quantity = int(request.form['quantity'])
             success, message = process_restock(inventory_data, selected_category, item_id, quantity)
             save_to_excel(inventory_data)
             return jsonify({'success': success, 'message': message})
-        return render_template('stock_counter.html', categories=categories, selected_category=selected_category, error=None)
+        return render_template('stock_counter.html', categories=categories, selected_category=selected_category, inventory_data=inventory_data_for_category, error=None)
     except Exception as e:
         logger.error("Error in stock_counter route: %s", str(e))
-        return render_template('stock_counter.html', categories=[], selected_category=None, error="Failed to load stock counter")
+        return render_template('stock_counter.html', categories=[], selected_category=None, inventory_data=[], error="Failed to load stock counter")
 
 @app.route('/sales_reform', methods=['GET', 'POST'])
 def sales_reform():
     try:
         categories = get_categories(inventory_data)
         if not categories:
-            return render_template('sales_reform.html', categories=[], selected_category=None, error="No categories available")
+            return render_template('sales_reform.html', categories=[], selected_category=None, inventory_data=[], error="No categories available")
         selected_category = request.form.get('category', categories[0])
+        inventory_data_for_category = get_inventory(inventory_data, selected_category)
         if request.method == 'POST' and 'sale' in request.form:
             item_id = request.form['item_id']
             quantity = int(request.form['quantity'])
             success, message = process_sale(inventory_data, selected_category, item_id, quantity)
             save_to_excel(inventory_data)
             return jsonify({'success': success, 'message': message})
-        return render_template('sales_reform.html', categories=categories, selected_category=selected_category, error=None)
+        return render_template('sales_reform.html', categories=categories, selected_category=selected_category, inventory_data=inventory_data_for_category, error=None)
     except Exception as e:
         logger.error("Error in sales_reform route: %s", str(e))
-        return render_template('sales_reform.html', categories=[], selected_category=None, error="Failed to load sales reform")
+        return render_template('sales_reform.html', categories=[], selected_category=None, inventory_data=[], error="Failed to load sales reform")
 
 @app.route('/api/inventory/<category>', methods=['GET'])
 def api_inventory(category):
     try:
+        logger.debug("Fetching inventory for category: %s", category)
         data = get_inventory(inventory_data, category)
+        logger.debug("Inventory data for %s: %s", category, data)
         return jsonify(data)
     except Exception as e:
         logger.error("Error in api_inventory route: %s", str(e))

@@ -27,15 +27,29 @@
         <table id="inventory-table">
             <thead>
                 <tr>
-                    <th>S.No.</th>
-                    <th>Item Name</th>
-                    <th>Stock</th>
+                    {% if inventory_data %}
+                        {% for column in inventory_data[0].keys() %}
+                            <th>{{ column.replace('_', ' ').title() }}</th>
+                        {% endfor %}
+                    {% else %}
+                        <th>No Data</th>
+                    {% endif %}
                 </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td colspan="3">Loading inventory data... (If this persists, ensure JavaScript is enabled and script.js is loaded)</td>
-                </tr>
+                {% if inventory_data %}
+                    {% for item in inventory_data %}
+                        <tr>
+                            {% for column in item.keys() %}
+                                <td>{{ item[column] if item[column] is not none else 'N/A' }}</td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td>No items found for this category.</td>
+                    </tr>
+                {% endif %}
             </tbody>
         </table>
     {% endif %}

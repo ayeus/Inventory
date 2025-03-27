@@ -94,7 +94,7 @@
         nav a:hover {
             text-decoration: underline;
         }
-        label[for="category"] {
+        label[for="table"] {
             font-weight: bold;
             margin-right: 10px;
         }
@@ -113,6 +113,14 @@
             background-color: #f0f0f0;
             cursor: pointer;
         }
+        .delete-row-button {
+            background-color: #ff4444;
+            padding: 5px 10px;
+            margin: 0 5px;
+        }
+        .delete-row-button:hover {
+            background-color: #cc0000;
+        }
     </style>
 </head>
 <body>
@@ -124,48 +132,64 @@
     </nav>
     {% if error %}
         <p class="error">{{ error }}</p>
-    {% else %}
-        <form method="POST" id="category-form">
-            <label for="category">Select Category:</label>
-            <select name="category" id="category">
-                {% for sanitized_category, original_category in categories %}
-                    <option value="{{ sanitized_category }}" {% if sanitized_category == selected_category %}selected{% endif %}>{{ original_category }}</option>
-                {% endfor %}
-            </select>
-        </form>
-        <table id="inventory-table">
-            <tbody>
-                {% if grid_data %}
-                    {% for row in grid_data %}
-                        <tr class="editable">
-                            {% for cell in row %}
-                                <td>{{ cell }}</td>
-                            {% endfor %}
-                        </tr>
-                    {% endfor %}
-                {% else %}
-                    <tr>
-                        <td>No data available for this category.</td>
-                    </tr>
-                {% endif %}
-            </tbody>
-        </table>
-        <h2>Add New Stock Entry</h2>
-        <form id="stock-form" method="POST" data-endpoint="/stock_counter">
-            <input type="hidden" name="category" value="{{ selected_category }}">
-            <input type="hidden" name="action" value="add_entry">
-            <div class="form-container">
-                {% for header in headers %}
-                    <div class="form-group">
-                        <label for="{{ header.replace(' ', '_').replace('.', '_').lower() }}">{{ header }}:</label>
-                        <input type="text" id="{{ header.replace(' ', '_').replace('.', '_').lower() }}" name="{{ header.replace(' ', '_').replace('.', '_').lower() }}" required>
-                    </div>
-                {% endfor %}
-            </div>
-            <button type="submit">Add Entry</button>
-        </form>
-        <button class="delete-button" id="delete-category">Delete All Items in Category</button>
-        <div id="message"></div>
     {% endif %}
+    <form id="table-form">
+        <label for="table">Select Table:</label>
+        <select name="table" id="table">
+            {% if tables %}
+                {% for table in tables %}
+                    <option value="{{ table }}" {% if table == selected_table %}selected{% endif %}>{{ table }}</option>
+                {% endfor %}
+            {% else %}
+                <option value="">No tables available</option>
+            {% endif %}
+        </select>
+    </form>
+    <table id="inventory-table">
+        <tbody>
+            {% if grid_data %}
+                {% for row in grid_data %}
+                    <tr {% if loop.index0 > 0 %}class="editable" data-row-id="{{ row[0] }}"{% endif %}>
+                        {% set is_data_row = loop.index0 > 0 %}
+                        {% for cell in row %}
+                            <td>
+                                {{ cell }}
+                                {% if loop.index0 == 1 and is_data_row %}
+                                    <button class="delete-row-button" onclick="deleteRow('{{ selected_table }}', '{{ row[0] }}')">Delete</button>
+                                {% endif %}
+                            </td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td>No data available for this table.</td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+    <h2>Add New Entry</h2>
+    <form id="stock-form" method="POST" data-endpoint="/stock_counter">
+        <input type="hidden" name="table" value="{{ selected_table if selected_table else '' }}">
+        <input type="hidden" name="action" value="add_entry">
+        <input type="hidden" name="row_id" value="">
+        <div class="form-container">
+            {% if headers %}
+                {% for header in headers %}
+                    {% if header != 'id' %}
+                        <div class="form-group">
+                            <label for="{{ header.replace(' ', '_').replace('.', '_').lower() }}">{{ header }}:</label>
+                            <input type="text" id="{{ header.replace(' ', '_').replace('.', '_').lower() }}" name="{{ header.replace(' ', '_').replace('.', '_').lower() }}" required>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            {% else %}
+                <p>No columns available to add a new entry.</p>
+            {% endif %}
+        </div>
+        <button type="submit">Add Entry</button>
+    </form>
+    <button class="delete-button" id="delete-all">Delete All Entries in Table</button>
+    <div id="message"></div>
 </body>
 </html>

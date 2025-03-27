@@ -1,10 +1,10 @@
-function loadTable(category) {
-    console.log("loadTable called with category:", category);
-    if (!category) {
-        console.log("No category provided, aborting loadTable");
+function loadTable(table) {
+    console.log("loadTable called with table:", table);
+    if (!table) {
+        console.log("No table provided, aborting loadTable");
         return;
     }
-    fetch(`/api/inventory/${category}`)
+    fetch(`/api/inventory/${table}`)
         .then(response => {
             console.log("Fetch response status for loadTable:", response.status);
             if (!response.ok) {
@@ -22,19 +22,28 @@ function loadTable(category) {
             tbody.innerHTML = '';
             
             if (!grid_data || grid_data.length === 0) {
-                console.log("No data to display for category:", category);
-                tbody.innerHTML = '<tr><td>No data available for this category.</td></tr>';
+                console.log("No data to display for table:", table);
+                tbody.innerHTML = '<tr><td>No data available for this table.</td></tr>';
                 updateStockForm([]);
                 return;
             }
             
             grid_data.forEach((row, rowIndex) => {
                 const tr = document.createElement('tr');
-                tr.className = 'editable';
-                tr.dataset.rowIndex = rowIndex;
-                row.forEach(cell => {
+                if (rowIndex > 0) {
+                    tr.className = 'editable';
+                    tr.dataset.rowId = row[0];  // Store the 'id' for editing/deleting
+                }
+                row.forEach((cell, cellIndex) => {
                     const td = document.createElement('td');
                     td.textContent = cell;
+                    if (cellIndex === 1 && rowIndex > 0) {  // Place Delete button in the second column
+                        const deleteButton = document.createElement('button');
+                        deleteButton.className = 'delete-row-button';
+                        deleteButton.textContent = 'Delete';
+                        deleteButton.onclick = () => deleteRow(table, row[0]);
+                        td.appendChild(deleteButton);
+                    }
                     tr.appendChild(td);
                 });
                 tbody.appendChild(tr);
@@ -44,21 +53,23 @@ function loadTable(category) {
 
             // Add click event listeners to editable rows
             document.querySelectorAll('.editable').forEach(row => {
-                row.addEventListener('click', () => {
-                    const rowIndex = row.dataset.rowIndex;
+                row.addEventListener('click', (e) => {
+                    if (e.target.className.includes('delete-row-button')) return;  // Ignore clicks on delete button
+                    const rowId = row.dataset.rowId;
                     const cells = row.querySelectorAll('td');
                     const headers = grid_data[0];
                     const form = document.getElementById('stock-form');
                     form.querySelector('input[name="action"]').value = 'edit_entry';
-                    form.querySelector('input[name="row_index"]').value = rowIndex;
+                    form.querySelector('input[name="row_id"]').value = rowId;
                     headers.forEach((header, colIndex) => {
+                        if (header === 'id') return;  // Skip 'id' column
                         const fieldName = header.replace(/[\s\.]/g, '_').toLowerCase();
                         const input = form.querySelector(`input[name="${fieldName}"]`);
                         if (input) {
                             input.value = cells[colIndex].textContent;
                         }
                     });
-                    document.getElementById('message').textContent = 'Editing row ' + rowIndex + '. Update the form and click "Add Entry" to save changes.';
+                    document.getElementById('message').textContent = 'Editing row with ID ' + rowId + '. Update the form and click "Add Entry" to save changes.';
                     document.getElementById('message').className = '';
                 });
             });
@@ -81,35 +92,35 @@ function updateStockForm(headers) {
         return;
     }
 
-    const categoryInput = form.querySelector('input[name="category"]');
+    const tableInput = form.querySelector('input[name="table"]');
     const actionInput = form.querySelector('input[name="action"]') || document.createElement('input');
     actionInput.type = 'hidden';
     actionInput.name = 'action';
     actionInput.value = 'add_entry';
 
-    const rowIndexInput = form.querySelector('input[name="row_index"]') || document.createElement('input');
-    rowIndexInput.type = 'hidden';
-    rowIndexInput.name = 'row_index';
-    rowIndexInput.value = '';
+    const rowIdInput = form.querySelector('input[name="row_id"]') || document.createElement('input');
+    rowIdInput.type = 'hidden';
+    rowIdInput.name = 'row_id';
+    rowIdInput.value = '';
 
     form.innerHTML = '';
-    if (categoryInput) {
-        form.appendChild(categoryInput);
+    if (tableInput) {
+        form.appendChild(tableInput);
     }
     form.appendChild(actionInput);
-    form.appendChild(rowIndexInput);
+    form.appendChild(rowIdInput);
 
     if (headers.length === 0) {
         console.log("No headers provided for form");
         const p = document.createElement('p');
-        p.textContent = 'No columns available for this category.';
+        p.textContent = 'No columns available for this table.';
         form.appendChild(p);
     } else {
         const formContainer = document.createElement('div');
         formContainer.className = 'form-container';
         headers.forEach(header => {
-            if (!header || header.trim() === '') {
-                console.log("Skipping empty header:", header);
+            if (header === 'id' || !header || header.trim() === '') {
+                console.log("Skipping header:", header);
                 return;
             }
 
@@ -190,10 +201,10 @@ function handleFormSubmit(formId, endpoint) {
                 messageDiv.className = 'success-message';
                 form.reset();
                 form.querySelector('input[name="action"]').value = 'add_entry';
-                form.querySelector('input[name="row_index"]').value = '';
-                const category = form.querySelector('input[name="category"]').value;
-                console.log("Reloading table for category:", category);
-                loadTable(category);
+                form.querySelector('input[name="row_id"]').value = '';
+                const table = form.querySelector('input[name="table"]').value;
+                console.log("Reloading table for table:", table);
+                loadTable(table);
             } else {
                 messageDiv.className = 'error-message';
             }
@@ -202,27 +213,22 @@ function handleFormSubmit(formId, endpoint) {
             console.error('Error submitting form:', error);
             const messageDiv = document.getElementById('message');
             if (messageDiv) {
-                messageDiv.textContent = 'Failed to add/update item: ' + error.message;
+                messageDiv.textContent = 'Failed to process request: ' + error.message;
                 messageDiv.className = 'error-message';
             }
         });
     });
 }
 
-function handleDeleteCategory() {
-    const form = document.getElementById('stock-form');
-    if (!form) {
-        console.log("Stock form not found for delete action");
-        return;
-    }
-    const category = form.querySelector('input[name="category"]').value;
-    if (!confirm(`Are you sure you want to delete all items in category "${category}"?`)) {
+function deleteRow(table, rowId) {
+    if (!confirm(`Are you sure you want to delete the entry with ID ${rowId}?`)) {
         return;
     }
 
     const formData = new FormData();
-    formData.append('category', category);
-    formData.append('action', 'delete_category');
+    formData.append('table', table);
+    formData.append('action', 'delete_entry');
+    formData.append('row_id', rowId);
 
     fetch('/stock_counter', {
         method: 'POST',
@@ -247,33 +253,105 @@ function handleDeleteCategory() {
         messageDiv.textContent = result.message;
         if (result.success) {
             messageDiv.className = 'success-message';
-            // Reload the page to reflect the deleted category
-            window.location.reload();
+            loadTable(table);
         } else {
             messageDiv.className = 'error-message';
         }
     })
     .catch(error => {
-        console.error('Error deleting category:', error);
+        console.error('Error deleting row:', error);
         const messageDiv = document.getElementById('message');
-        messageDiv.textContent = 'Failed to delete category: ' + error.message;
+        messageDiv.textContent = 'Failed to delete row: ' + error.message;
+        messageDiv.className = 'error-message';
+    });
+}
+
+function handleDeleteAll() {
+    const form = document.getElementById('stock-form');
+    if (!form) {
+        console.log("Stock form not found for delete action");
+        return;
+    }
+    const table = form.querySelector('input[name="table"]').value;
+    if (!table) {
+        console.log("No table selected for delete all action");
+        return;
+    }
+    if (!confirm(`Are you sure you want to delete all entries in table "${table}"?`)) {
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('table', table);
+    formData.append('action', 'delete_all');
+
+    fetch('/stock_counter', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.text().then(text => {
+                throw new Error(`HTTP error! status: ${response.status}, response: ${text}`);
+            });
+        }
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            return response.text().then(text => {
+                throw new Error('Expected JSON response, but received: ' + text);
+            });
+        }
+        return response.json();
+    })
+    .then(result => {
+        const messageDiv = document.getElementById('message');
+        messageDiv.textContent = result.message;
+        if (result.success) {
+            messageDiv.className = 'success-message';
+            loadTable(table);
+        } else {
+            messageDiv.className = 'error-message';
+        }
+    })
+    .catch(error => {
+        console.error('Error deleting all entries:', error);
+        const messageDiv = document.getElementById('message');
+        messageDiv.textContent = 'Failed to delete all entries: ' + error.message;
         messageDiv.className = 'error-message';
     });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log("DOM fully loaded, initializing script");
-    const categorySelect = document.getElementById('category');
-    if (categorySelect) {
-        console.log("Category select found, value:", categorySelect.value);
-        categorySelect.addEventListener('change', (e) => {
-            console.log("Category changed to:", e.target.value);
-            const form = categorySelect.closest('form');
-            form.submit();
+    const tableSelect = document.getElementById('table');
+    if (tableSelect) {
+        console.log("Table select found, value:", tableSelect.value);
+        tableSelect.addEventListener('change', (e) => {
+            e.preventDefault();  // Prevent default form submission
+            const selectedTable = e.target.value;
+            console.log("Table changed to:", selectedTable);
+            
+            // Update the hidden table input in the stock form
+            const stockForm = document.getElementById('stock-form');
+            if (stockForm) {
+                const tableInput = stockForm.querySelector('input[name="table"]');
+                if (tableInput) {
+                    tableInput.value = selectedTable;
+                }
+            } else {
+                console.log("Stock form not found");
+            }
+            
+            // Load the table data dynamically
+            loadTable(selectedTable);
         });
-        loadTable(categorySelect.value);
+        if (tableSelect.value) {
+            loadTable(tableSelect.value);
+        } else {
+            console.log("No table selected, skipping loadTable");
+        }
     } else {
-        console.log("Category select not found");
+        console.log("Table select not found");
     }
 
     const stockForm = document.getElementById('stock-form');
@@ -284,9 +362,11 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log("Stock form not found on page load");
     }
 
-    const deleteButton = document.getElementById('delete-category');
-    if (deleteButton) {
-        deleteButton.addEventListener('click', handleDeleteCategory);
+    const deleteAllButton = document.getElementById('delete-all');
+    if (deleteAllButton) {
+        deleteAllButton.addEventListener('click', handleDeleteAll);
+    } else {
+        console.log("Delete all button not found");
     }
 
     if (document.getElementById('sales-form')) {

@@ -1,9 +1,10 @@
 import os
 from flask import Flask, render_template, request, jsonify
-from excel_handler import load_excel_data, update_inventory_data, delete_category_data
+from excel_handler import load_excel_data
 from inventory import get_categories, get_inventory, update_inventory
 from sales import process_sale
 from restock import process_restock
+from db import get_tables, get_table_data, add_table_entry, update_table_entry, delete_table_entry, delete_all_entries
 import logging
 
 # Set up the Flask app with correct template and static folder paths
@@ -15,9 +16,9 @@ app = Flask(__name__,
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Load inventory data (global variable to be updated after changes)
+# Load inventory data from Excel (for Product Table and Sales Reform)
 inventory_data = load_excel_data()
-logger.debug("Inventory data loaded: %s", inventory_data)
+logger.debug("Inventory data loaded from Excel: %s", inventory_data)
 
 @app.route('/')
 def index():
@@ -46,7 +47,6 @@ def product_table():
 
 @app.route('/stock_counter', methods=['GET', 'POST'])
 def stock_counter():
-    global inventory_data
     logger.debug("Accessing stock_counter route, method: %s", request.method)
     
     # Handle POST requests (form submission, edit, delete)
@@ -55,33 +55,32 @@ def stock_counter():
             action = request.form.get('action', 'add_entry')
             logger.debug("Action received: %s", action)
             
-            categories = get_categories(inventory_data)
-            if not categories:
-                logger.warning("No categories available in stock_counter")
-                return jsonify({'success': False, 'message': "No categories available"}), 400
+            tables = get_tables()
+            if not tables:
+                logger.warning("No tables available in stock_counter")
+                return jsonify({'success': False, 'message': "No tables available in the database"}), 400
             
-            selected_sanitized_category = request.form.get('category')
-            if not selected_sanitized_category:
-                logger.error("No category provided in form data")
-                return jsonify({'success': False, 'message': "Category is required"}), 400
+            selected_table = request.form.get('table')
+            if not selected_table:
+                logger.error("No table provided in form data")
+                return jsonify({'success': False, 'message': "Table is required"}), 400
             
-            selected_original_category = next((orig for sanitized, orig in categories if sanitized == selected_sanitized_category), None)
-            if not selected_original_category:
-                logger.error("Invalid category: %s", selected_sanitized_category)
-                return jsonify({'success': False, 'message': "Invalid category"}), 400
+            if selected_table not in tables:
+                logger.error("Invalid table: %s", selected_table)
+                return jsonify({'success': False, 'message': "Invalid table"}), 400
             
-            grid_data = get_inventory(inventory_data, selected_sanitized_category)
+            grid_data = get_table_data(selected_table)
             if not grid_data:
-                logger.warning("No data found for category: %s", selected_sanitized_category)
-                return jsonify({'success': False, 'message': "No data available for this category"}), 400
+                logger.warning("No data found for table: %s", selected_table)
+                return jsonify({'success': False, 'message': "No data available for this table"}), 400
             
             headers = grid_data[0] if grid_data else []
-            valid_headers = [header for header in headers if header and str(header).strip() != '']
-            logger.debug("Valid headers for category %s: %s", selected_sanitized_category, valid_headers)
+            valid_headers = [header for header in headers if header != 'id']  # Exclude 'id' from form fields
+            logger.debug("Valid headers for table %s: %s", selected_table, valid_headers)
             
             if not valid_headers:
-                logger.error("No valid headers found for category: %s", selected_sanitized_category)
-                return jsonify({'success': False, 'message': "No valid columns found in the category"}), 400
+                logger.error("No valid headers found for table: %s", selected_table)
+                return jsonify({'success': False, 'message': "No valid columns found in the table"}), 400
             
             if action == 'add_entry':
                 logger.debug("Received POST request for stock_counter (add_entry)")
@@ -94,46 +93,56 @@ def stock_counter():
                     new_entry.append(value)
                 logger.debug("New entry to be added: %s", new_entry)
                 
-                success, message = update_inventory_data(selected_original_category, valid_headers, new_entry)
-                logger.debug("Update result: success=%s, message=%s", success, message)
+                success, message = add_table_entry(selected_table, new_entry)
+                logger.debug("Add result: success=%s, message=%s", success, message)
                 if success:
-                    inventory_data.clear()
-                    inventory_data.update(load_excel_data())
-                    message = "Item successfully added/updated in inventory."
+                    message = "Item successfully added to the database."
                 else:
-                    message = f"Failed to add/update item: {message}"
+                    message = f"Failed to add item: {message}"
                 return jsonify({'success': success, 'message': message})
             
             elif action == 'edit_entry':
                 logger.debug("Received POST request for stock_counter (edit_entry)")
                 logger.debug("Form data: %s", dict(request.form))
                 
-                row_index = int(request.form.get('row_index')) + 1  # Adjust for header row
+                row_id = request.form.get('row_id')
+                if not row_id:
+                    return jsonify({'success': False, 'message': "Row ID is required for editing"}), 400
+                
                 edited_entry = []
                 for header in valid_headers:
                     field_name = header.replace(' ', '_').replace('.', '_').lower()
                     value = request.form.get(field_name, '')
                     edited_entry.append(value)
-                logger.debug("Edited entry at row %d: %s", row_index, edited_entry)
+                logger.debug("Edited entry for id %s: %s", row_id, edited_entry)
                 
-                success, message = update_inventory_data(selected_original_category, valid_headers, edited_entry, row_index=row_index)
+                success, message = update_table_entry(selected_table, row_id, edited_entry)
                 if success:
-                    inventory_data.clear()
-                    inventory_data.update(load_excel_data())
-                    message = "Item successfully updated in inventory."
+                    message = "Item successfully updated in the database."
                 else:
                     message = f"Failed to update item: {message}"
                 return jsonify({'success': success, 'message': message})
             
-            elif action == 'delete_category':
-                logger.debug("Received POST request for stock_counter (delete_category)")
-                success, message = delete_category_data(selected_original_category)
+            elif action == 'delete_entry':
+                logger.debug("Received POST request for stock_counter (delete_entry)")
+                row_id = request.form.get('row_id')
+                if not row_id:
+                    return jsonify({'success': False, 'message': "Row ID is required for deletion"}), 400
+                
+                success, message = delete_table_entry(selected_table, row_id)
                 if success:
-                    inventory_data.clear()
-                    inventory_data.update(load_excel_data())
-                    message = f"All items in category '{selected_original_category}' deleted successfully."
+                    message = "Item successfully deleted from the database."
                 else:
-                    message = f"Failed to delete category: {message}"
+                    message = f"Failed to delete item: {message}"
+                return jsonify({'success': success, 'message': message})
+            
+            elif action == 'delete_all':
+                logger.debug("Received POST request for stock_counter (delete_all)")
+                success, message = delete_all_entries(selected_table)
+                if success:
+                    message = f"All items in table '{selected_table}' deleted successfully."
+                else:
+                    message = f"Failed to delete all items: {message}"
                 return jsonify({'success': success, 'message': message})
             
             else:
@@ -146,26 +155,27 @@ def stock_counter():
     
     # Handle GET requests (render the page)
     try:
-        categories = get_categories(inventory_data)
-        if not categories:
-            logger.warning("No categories available in stock_counter")
-            return render_template('stock_counter.html', categories=[], selected_category=None, grid_data=[], headers=[], error="No categories available")
+        tables = get_tables()
+        if not tables:
+            logger.warning("No tables available in stock_counter")
+            return render_template('stock_counter.html', tables=tables, selected_table=None, grid_data=[], headers=[], error="No tables available in the database. Please check if the database is set up correctly.")
         
-        selected_sanitized_category = request.form.get('category', categories[0][0])
-        selected_original_category = next((orig for sanitized, orig in categories if sanitized == selected_sanitized_category), None)
-        grid_data = get_inventory(inventory_data, selected_sanitized_category)
+        selected_table = request.args.get('table', tables[0])  # Use query parameter instead of form data
+        if selected_table not in tables:
+            selected_table = tables[0]
         
+        grid_data = get_table_data(selected_table)
         headers = grid_data[0] if grid_data else []
-        valid_headers = [header for header in headers if header and str(header).strip() != '']
+        valid_headers = [header for header in headers if header != 'id']
         
         if not grid_data:
-            logger.warning("No data found for category: %s", selected_sanitized_category)
-            return render_template('stock_counter.html', categories=categories, selected_category=selected_sanitized_category, grid_data=[], headers=valid_headers, error="No data available for this category")
+            logger.warning("No data found for table: %s", selected_table)
+            return render_template('stock_counter.html', tables=tables, selected_table=selected_table, grid_data=[], headers=valid_headers, error="No data available for this table")
         
-        return render_template('stock_counter.html', categories=categories, selected_category=selected_sanitized_category, grid_data=grid_data, headers=valid_headers, error=None)
+        return render_template('stock_counter.html', tables=tables, selected_table=selected_table, grid_data=grid_data, headers=valid_headers, error=None)
     except Exception as e:
         logger.error("Error in stock_counter GET route: %s", str(e))
-        return render_template('stock_counter.html', categories=[], selected_category=None, grid_data=[], headers=[], error="Failed to load stock counter page")
+        return render_template('stock_counter.html', tables=[], selected_table=None, grid_data=[], headers=[], error=f"Failed to load stock counter page: {str(e)}")
 
 @app.route('/sales_reform', methods=['GET', 'POST'])
 def sales_reform():
@@ -196,16 +206,21 @@ def sales_reform():
         logger.error("Error in sales_reform route: %s", str(e))
         return render_template('sales_reform.html', categories=[], selected_category=None, grid_data=[], error="Failed to load sales reform")
 
-@app.route('/api/inventory/<category>', methods=['GET'])
-def api_inventory(category):
-    logger.debug("Accessing api_inventory route for category: %s", category)
+@app.route('/api/inventory/<table>', methods=['GET'])
+def api_inventory(table):
+    logger.debug("Accessing api_inventory route for table: %s", table)
     try:
-        grid_data = get_inventory(inventory_data, category)
-        logger.debug("Inventory data for %s: %s", category, grid_data)
+        # Check if the request is for a MySQL table (Stock Counter) or Excel category (Product Table/Sales Reform)
+        tables = get_tables()
+        if table in tables:
+            grid_data = get_table_data(table)
+        else:
+            grid_data = get_inventory(inventory_data, table)
+        logger.debug("Data for %s: %s", table, grid_data)
         return jsonify(grid_data)
     except Exception as e:
         logger.error("Error in api_inventory route: %s", str(e))
-        return jsonify({'error': 'Failed to load inventory'}), 500
+        return jsonify({'error': 'Failed to load data'}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)

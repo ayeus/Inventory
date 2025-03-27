@@ -1,5 +1,5 @@
 import logging
-from excel_handler import update_inventory_data
+from excel_handler import load_excel_data
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +29,7 @@ def process_sale(inventory_data, sanitized_category, item_id, quantity, headers)
             return False, "No items in this category"
 
         item_found = False
-        row_index = None
-        for idx, row in enumerate(grid_data[1:], start=2):
+        for row in grid_data[1:]:
             if str(row[s_no_idx]) == str(item_id):
                 current_stock = int(row[stock_idx]) if row[stock_idx] and str(row[stock_idx]).isdigit() else 0
                 if current_stock < quantity:
@@ -38,14 +37,13 @@ def process_sale(inventory_data, sanitized_category, item_id, quantity, headers)
                 new_stock = current_stock - quantity
                 row[stock_idx] = new_stock
                 item_found = True
-                row_index = idx
                 break
 
         if not item_found:
             return False, "Item not found"
 
-        success, message = update_inventory_data(original_category, headers, row, row_index=row_index)
-        return success, message if success else f"Sale failed: {message}"
+        # Since we're not editing the Excel file, just return success
+        return True, "Sale recorded successfully (Excel file not modified)"
     except Exception as e:
         logger.error("Error in process_sale: %s", str(e))
         return False, f"Error processing sale: {str(e)}"

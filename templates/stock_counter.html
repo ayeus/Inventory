@@ -2,47 +2,52 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Stock Counmmmnter</title>
+    <title>Stock Counter</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/sc.css') }}">
     <script src="{{ url_for('static', filename='js/script.js') }}" defer></script>
     <style>
         table, th, td {
             border: 1px solid black;
             border-collapse: collapse;
-            padding: 5px;
+            padding: 8px;
             text-align: left;
         }
         table {
             width: 100%;
             max-width: 100%;
             background-color: white;
+            margin-top: 20px;
         }
         .error {
             color: red;
             font-weight: bold;
+            margin: 10px 0;
         }
         .form-container {
             margin-top: 20px;
             max-width: 600px;
         }
         .form-group {
-            margin-bottom: 10px;
+            margin-bottom: 15px;
             display: flex;
             align-items: center;
         }
         .form-group label {
             width: 150px;
             font-weight: bold;
+            color: #333;
         }
         .form-group input {
             flex: 1;
-            padding: 5px;
+            padding: 8px;
             border: 1px solid #ccc;
             border-radius: 4px;
+            font-size: 14px;
         }
         .form-group input:focus {
             outline: none;
             border-color: #4CAF50;
+            box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
         }
         button {
             background-color: #4CAF50;
@@ -52,13 +57,61 @@
             border-radius: 4px;
             cursor: pointer;
             margin-top: 10px;
+            font-size: 16px;
         }
         button:hover {
             background-color: #45a049;
         }
         #message {
-            margin-top: 10px;
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
             font-weight: bold;
+            font-size: 14px;
+        }
+        .success-message {
+            color: #155724;
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+        .error-message {
+            color: #721c24;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        nav {
+            margin: 10px 0;
+        }
+        nav a {
+            margin-right: 15px;
+            text-decoration: none;
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        nav a:hover {
+            text-decoration: underline;
+        }
+        label[for="category"] {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        select {
+            padding: 5px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        .delete-button {
+            background-color: #ff4444;
+        }
+        .delete-button:hover {
+            background-color: #cc0000;
+        }
+        .editable:hover {
+            background-color: #f0f0f0;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -73,7 +126,7 @@
         <p class="error">{{ error }}</p>
     {% else %}
         <form method="POST" id="category-form">
-            <label for="category">Select aaaa:</label>
+            <label for="category">Select Category:</label>
             <select name="category" id="category">
                 {% for sanitized_category, original_category in categories %}
                     <option value="{{ sanitized_category }}" {% if sanitized_category == selected_category %}selected{% endif %}>{{ original_category }}</option>
@@ -84,7 +137,7 @@
             <tbody>
                 {% if grid_data %}
                     {% for row in grid_data %}
-                        <tr>
+                        <tr class="editable">
                             {% for cell in row %}
                                 <td>{{ cell }}</td>
                             {% endfor %}
@@ -98,16 +151,20 @@
             </tbody>
         </table>
         <h2>Add New Stock Entry</h2>
-        <form id="stock-form" method="POST">
+        <form id="stock-form" method="POST" data-endpoint="/stock_counter">
             <input type="hidden" name="category" value="{{ selected_category }}">
-            {% for header in headers %}
-                <div class="form-group">
-                    <label for="{{ header.replace(' ', '_').replace('.', '_').lower() }}">{{ header }}:</label>
-                    <input type="text" id="{{ header.replace(' ', '_').replace('.', '_').lower() }}" name="{{ header.replace(' ', '_').replace('.', '_').lower() }}" required>
-                </div>
-            {% endfor %}
-            <button type="submit" name="add_entry">Add Entry</button>
+            <input type="hidden" name="action" value="add_entry">
+            <div class="form-container">
+                {% for header in headers %}
+                    <div class="form-group">
+                        <label for="{{ header.replace(' ', '_').replace('.', '_').lower() }}">{{ header }}:</label>
+                        <input type="text" id="{{ header.replace(' ', '_').replace('.', '_').lower() }}" name="{{ header.replace(' ', '_').replace('.', '_').lower() }}" required>
+                    </div>
+                {% endfor %}
+            </div>
+            <button type="submit">Add Entry</button>
         </form>
+        <button class="delete-button" id="delete-category">Delete All Items in Category</button>
         <div id="message"></div>
     {% endif %}
 </body>
